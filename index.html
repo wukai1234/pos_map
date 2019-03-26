@@ -1,0 +1,210 @@
+<html>
+
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+		<meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+		<link rel="stylesheet" href="./mui.min.css">
+		<link href="./mui.picker.css" rel="stylesheet" />
+		<link href="./mui.poppicker.css" rel="stylesheet" />
+		<style type="text/css">
+			body,
+			html,
+			#allmap {
+				width: 100%;
+				height: 100%;
+				overflow: hidden;
+				margin: 0;
+				font-family: "微软雅黑";
+			}
+			.mui-content-padded
+			{
+			    margin: 0px 0px;
+			}
+		</style>
+		<script src="./mui.min.js"></script>
+		<script src="./mui.picker.js"></script>
+		<script src="./mui.poppicker.js"></script>
+		<script src="./hb.data.js" type="text/javascript" charset="utf-8"></script>
+
+		<script type="text/javascript" src="https://api.map.baidu.com/api?v=2.0&ak=QTEKrjd0NPB42S7DpZtmBMsiE3u7q2Iq&s=1"></script>
+		<script type="text/javascript">		
+		//初始化二级选择
+		(function($, doc) {
+				//alert(111);
+				$.init();
+				$.ready(function() {
+					//init();
+					//级联示例
+					var cityPicker = new $.PopPicker({
+						layer: 2
+					});
+					cityPicker.setData(cityData);
+					var showCityPickerButton = doc.getElementById('showCityPicker');
+					var cityResult = doc.getElementById('cityResult');
+					
+					showCityPickerButton.addEventListener('tap', function(event) {
+						cityPicker.show(function(items) {
+							onAddressChanged('河北省',items[0].text,items[1].text);							
+						});
+					}, false);
+					
+				});
+			})(mui, document);
+			
+			var pageRows = 200;
+			var sumRows = 0;
+			var getPosPositions = function(address, callbackFunction, pageIndex) {
+				var url = "http://192.168.1.100:8080/WxbsWebServer/posposition?addr=" + encodeURIComponent(address);
+				url = url + "&page=" + pageIndex + "&rows=" + pageRows;
+				var xmlhttp;
+				if(window.XMLHttpRequest) {
+					xmlhttp = new XMLHttpRequest();
+					if(xmlhttp.overrideMimeType) {
+						xmlhttp.overrideMimeType('text/xml');
+					}
+				} else if(window.ActiveXObject) {
+					xmlhttp = new ActiveXObject("Microsoft.XMLHTTP");
+				}
+				xmlhttp.onreadystatechange = function() {
+					if(4 == xmlhttp.readyState) {
+						if(200 == xmlhttp.status) {
+							var rspobj = xmlhttp.responseText;
+							if(rspobj) {
+								var positionsList = JSON.parse(rspobj);
+								var posZuobiao = positionsList.ZUOBIAO;
+								var returnRows = 0;
+								for(var i in posZuobiao) {
+									returnRows++;
+									sumRows++;
+									callbackFunction(posZuobiao[i]);
+								}
+								if(returnRows == pageRows) {
+									pageIndex++;
+									getPosPositions(address, callbackFunction, pageIndex);
+								}else{
+									cityResult.innerText = cityResult.innerText+' ('+sumRows+'台)';
+								}
+							}
+						}
+					}
+				};
+				xmlhttp.open("post", url, true);
+				xmlhttp.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+				xmlhttp.send(null);
+			};
+			
+		</script>
+		<title>社保自助缴费系统地图</title>
+	</head>
+
+	<body>
+		<div class="mui-content-padded">
+			<div class="mui-scroll">
+				<ul class="mui-table-view mui-table-view-chevron">
+					<li class="mui-table-view-cell">
+						<a href="#account" id="showCityPicker" class="mui-navigate">所在区(县)
+							<i id="cityResult" class="mui-pull-right update">请选择</i>
+							<input type="hidden" id="citycode" />
+						</a>
+					</li>
+				</ul>
+			</div>
+		</div>
+		<div id="allmap"></div>
+	</body>
+
+</html>
+<script type="text/javascript">
+	window.HOST_TYPE='2';
+	// 百度地图API功能
+	var map = new BMap.Map("allmap");
+	var point = new BMap.Point(114.44578, 38.036668);
+	var myIcon = new BMap.Icon("http://api.map.baidu.com/img/markers.png", new BMap.Size(22, 24), {
+		offset: new BMap.Size(12, 20), // 指定定位位置
+		imageOffset: new BMap.Size(1, 0 - 10 * 25) // 设置图片偏移
+	});
+	map.centerAndZoom(point, 14);
+	map.enableScrollWheelZoom(true);
+	var geoc = new BMap.Geocoder();
+	var geolocation = new BMap.Geolocation();
+	var beginPoint;
+	var endPoint;
+	var firstPoint=true;
+	var driving;
+	geolocation.getCurrentPosition(function(r) {
+		if(this.getStatus() == BMAP_STATUS_SUCCESS) {
+			beginPoint = r.point;			
+			geoc.getLocation(r.point, function(rs) {
+				var addComp = rs.addressComponents;	
+				//alert('addComp.district' + addComp.district);
+				onAddressChanged(addComp.province,addComp.city,addComp.district);				
+			});
+		} else {
+			alert('failed' + this.getStatus());
+		}
+	}, {
+		enableHighAccuracy: true
+	});
+	var onAddressChanged=function(province,city,district){		
+		if('河北省'!=province)return;
+		cityResult.innerText = "" + city + " " + district+"";
+		map.clearOverlays();
+		var mk = new BMap.Marker(beginPoint, {
+				icon: myIcon
+			});
+		map.addOverlay(mk);
+		var address = province + ',' + city + ',' + district;
+		if(firstPoint){
+			map.panTo(beginPoint);
+			firstPoint=false;
+		}else{
+			map.centerAndZoom(address, 14);
+		}
+		sumRows=0;
+		getPosPositions(address, setMapPositions, 1);
+	};
+	var setMapPositions = function(posZuobiao) {
+		var point = new BMap.Point(posZuobiao.JINGDU, posZuobiao.WEIDU);
+		var marker = new BMap.Marker(point);
+		marker.addr = posZuobiao.ADDRESS;
+		var splitStr = '中国河北省';
+		var splitStrIdx = marker.addr.indexOf(splitStr);
+		if(splitStrIdx >= 0) {
+			marker.addr = marker.addr.substring(splitStrIdx + splitStr.length);
+		}
+		marker.swjg = posZuobiao.SWJGJC;
+		marker.bgdw = posZuobiao.BGDW;
+		marker.addEventListener("click", onPosClicked);
+		map.addOverlay(marker);
+	};
+	var onPosClicked = function(e) {
+		var p = e.target;
+		endPoint = p.getPosition();
+		if(driving) driving.clearResults();
+		map.panTo(endPoint);
+		//driveTo(endPoint);
+		//alert("marker的位置是" + p.getPosition().lng + "," + p.getPosition().lat);
+		var opts = {
+			width: 250, // 信息窗口宽度    
+			height: 100, // 信息窗口高度    
+			title: '' + p.bgdw // 信息窗口标题   
+		}
+		var popupContent = "<p style='margin:0;line-height:1.5;font-size:13px;text-indent:2em'>地址：" + p.addr + "</p>";
+		popupContent = popupContent + "<p style='margin:0;line-height:1.5;font-size:13px;text-indent:2em'>税局：" + p.swjg + "</p>";
+		popupContent = popupContent + "<div style='text-align:right'>";
+		popupContent = popupContent + "<input type='button' onclick='driveTo()' value='&nbsp;到这里&nbsp;'/>";
+		popupContent = popupContent + "</div>";
+		var infoWindow = new BMap.InfoWindow(popupContent, opts); // 创建信息窗口对象
+		this.openInfoWindow(infoWindow); // 打开信息窗口
+	};
+
+	var driveTo = function() {
+		driving = new BMap.DrivingRoute(map, {
+			renderOptions: {
+				map: map,
+				autoViewport: true
+			}
+		});
+		driving.search(beginPoint, endPoint);
+	};
+</script>
