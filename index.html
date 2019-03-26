@@ -54,7 +54,7 @@
 			var pageRows = 200;
 			var sumRows = 0;
 			var getPosPositions = function(address, callbackFunction, pageIndex) {
-				var url = "http://192.168.1.100:8080/WxbsWebServer/posposition?addr=" + encodeURIComponent(address);
+				var url = "http://wxsbf.he-n-tax.gov.cn/WxbsWebServer/posposition?addr=" + encodeURIComponent(address);
 				url = url + "&page=" + pageIndex + "&rows=" + pageRows;
 				var xmlhttp;
 				if(window.XMLHttpRequest) {
